@@ -1,6 +1,7 @@
 CC=gcc
 #CC=clang
-CFLAGS=-Wall -Wextra -Werror -std=gnu11 -O2 -g -pthread
+CFLAGS=-Wall -Wextra -Werror -std=gnu11 -O2 -pthread
+#CFLAGS=-Wall -Wextra -Werror -std=gnu11 -O2 -pthread -g
 LIB=-lm
 OBJ=build/main.o build/numbers.o
 

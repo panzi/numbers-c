@@ -25,6 +25,7 @@ typedef struct Worker {
 
 static Expr *new_val(unsigned long value, size_t index);
 static Expr *new_expr(Op op, const Expr *left, const Expr *right);
+static bool expr_equals(const Expr *left, const Expr *right);
 
 static void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b);
 
@@ -42,7 +43,7 @@ Expr *new_val(unsigned long value, size_t index) {
 
 	if (!expr) {
 		perror("allocating new value");
-		abort();
+		exit(1);
 	}
 
 	expr->op = OpVal;
@@ -58,7 +59,7 @@ Expr *new_expr(Op op, const Expr *left, const Expr *right) {
 
 	if (!expr) {
 		perror("allocating new expression");
-		abort();
+		exit(1);
 	}
 
 	expr->op = op;
@@ -84,12 +85,40 @@ Expr *new_expr(Op op, const Expr *left, const Expr *right) {
 
 	default:
 		fprintf(stderr, "illegal operation\n");
-		abort();
+		exit(1);
 	}
 
 	expr->used = left->used | right->used;
 
 	return expr;
+}
+
+bool expr_equals(const Expr *left, const Expr *right) {
+	if (left == right) {
+		return true;
+	}
+
+	if (left->op != right->op || left->value != right->value) {
+		return false;
+	}
+
+	if (left->op != OpVal) {
+		if (!expr_equals(left->u.e.left, right->u.e.left) || !expr_equals(left->u.e.right, right->u.e.right)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool exprbuf_contains(const ExprBuf *buf, const Expr *expr) {
+	for (size_t index = 0; index < buf->size; ++ index) {
+		const Expr *other = buf->buf[index];
+		if (expr_equals(expr, other)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b) {
@@ -144,39 +173,22 @@ void exprbuf_init(ExprBuf *buf) {
 
 	if (!buf->buf) {
 		perror("allocating expression buffer");
-		abort();
+		exit(1);
 	}
-}
-
-void exprbuf_swap(ExprBuf *left, ExprBuf *right) {
-	Expr **buf = left->buf;
-	const size_t capacity = left->capacity;
-	const size_t size = left->size;
-
-	left->buf      = right->buf;
-	left->capacity = right->capacity;
-	left->size     = right->size;
-
-	right->buf      = buf;
-	right->capacity = capacity;
-	right->size     = size;
 }
 
 void exprbuf_add(ExprBuf *buf, Expr *expr) {
-	if (buf->capacity == 0) {
-		exprbuf_init(buf);
-	}
-	else if (buf->size == buf->capacity) {
+	if (buf->size == buf->capacity) {
 		if (SIZE_MAX / 2 < buf->capacity) {
 			fprintf(stderr, "integer overflow\n");
-			abort();
+			exit(1);
 		}
-		const size_t capacity = buf->capacity * 2;
+		const size_t capacity = buf->capacity == 0 ? 32 : buf->capacity * 2;
 		buf->buf = realloc(buf->buf, capacity * sizeof(Expr));
 		buf->capacity = capacity;
 		if (!buf->buf) {
 			perror("resizing expression buffer");
-			abort();
+			exit(1);
 		}
 	}
 
@@ -304,6 +316,7 @@ void expr_fprint_op(FILE *stream, char op, const Expr *expr) {
 	}
 }
 
+#if 1
 void expr_fprint(FILE *stream, const Expr *expr) {
 	switch (expr->op) {
 		case OpAdd: expr_fprint_op(stream, '+', expr); break;
@@ -313,6 +326,24 @@ void expr_fprint(FILE *stream, const Expr *expr) {
 		case OpVal: fprintf(stream, "%lu", expr->value); break;
 	}
 }
+#else
+void expr_fprint(FILE *stream, const Expr *expr) {
+	fprintf(stream, "(0x%lx)(", (uintptr_t)expr);
+	if (expr->op == OpVal) {
+		fprintf(stream, "%lu #%zu", expr->value, expr->u.index);
+	}
+	else {
+		switch (expr->op) {
+			case OpAdd: expr_fprint_op(stream, '+', expr); break;
+			case OpSub: expr_fprint_op(stream, '-', expr); break;
+			case OpMul: expr_fprint_op(stream, '*', expr); break;
+			case OpDiv: expr_fprint_op(stream, '/', expr); break;
+			case OpVal: break;
+		}
+	}
+	fprintf(stream, ")");
+}
+#endif
 
 void numbers_solutions(
 	const size_t tasks, const unsigned long target, const unsigned long numbers[],
@@ -320,29 +351,31 @@ void numbers_solutions(
 
 	if (tasks == 0) {
 		fprintf(stderr, "number of tasks has to be >= 1\n");
-		abort();
+		exit(1);
 	}
 
 	if (count > sizeof(size_t) * 8) {
 		fprintf(stderr, "only up to %lu numbers supported\n", sizeof(size_t) * 8);
-		abort();
+		exit(1);
 	}
 
 	Manager manager;
+	ExprBuf uniq_solutions;
 
-	if (sem_init(&manager.semaphore, 0, 1) != 0) {
+	if (sem_init(&manager.semaphore, 0, 0) != 0) {
 		perror("initializing manager semaphore");
-		abort();
+		exit(1);
 	}
 
 	const unsigned long full_usage = ~(~0ul << count);
 
 	exprbuf_init(&manager.exprs);
+	exprbuf_init(&uniq_solutions);
 
 	Worker *workers = calloc(tasks, sizeof(Worker));
 	if (!workers) {
 		perror("allocating workers array");
-		abort();
+		exit(1);
 	}
 
 	for (size_t index = 0; index < tasks; ++ index) {
@@ -350,9 +383,9 @@ void numbers_solutions(
 		exprbuf_init((ExprBuf*)&worker->new_exprs);
 		worker->manager = &manager;
 
-		if (sem_init(&worker->semaphore, 0, 1) != 0) {
+		if (sem_init(&worker->semaphore, 0, 0) != 0) {
 			perror("initializing worker semaphore");
-			abort();
+			exit(1);
 		}
 	}
 
@@ -373,7 +406,7 @@ void numbers_solutions(
 		const int errnum = pthread_create(&worker->thread, NULL, &worker_proc, worker);
 		if (errnum != 0) {
 			fprintf(stderr, "starting worker therad: %s\n", strerror(errnum));
-			abort();
+			exit(1);
 		}
 	}
 
@@ -396,7 +429,7 @@ void numbers_solutions(
 			if (xi > x_last) {
 				if (worker_count >= tasks) {
 					fprintf(stderr, "calculating worker count: more workers than requested tasks\n");
-					abort();
+					exit(1);
 				}
 				const size_t xim1 = x_last;
 
@@ -406,7 +439,7 @@ void numbers_solutions(
 
 				if (sem_post(&worker->semaphore) != 0) {
 					perror("sending work to worker thread");
-					abort();
+					exit(1);
 				}
 
 				x_last = xi;
@@ -416,10 +449,15 @@ void numbers_solutions(
 			++ i;
 		}
 
+		if (worker_count == 0) {
+			fprintf(stderr, "BUG: no worker created\n");
+			exit(1);
+		}
+
 		for (size_t finished = 0; finished < worker_count; ++ finished) {
 			if (sem_wait(&manager.semaphore) != 0) {
 				perror("waiting for worker thread");
-				abort();
+				exit(1);
 			}
 		}
 
@@ -428,8 +466,13 @@ void numbers_solutions(
 			for (size_t i = 0; i < worker->new_exprs.size; ++ i) {
 				Expr *expr = worker->new_exprs.buf[i];
 				if (expr->value == target) {
-					callback(arg, expr);
-					free(expr);
+					if (!exprbuf_contains(&uniq_solutions, expr)) {
+						exprbuf_add(&uniq_solutions, expr);
+						callback(arg, expr);
+					}
+					else {
+						free(expr);
+					}
 				} else if (expr->used != full_usage) {
 					exprbuf_add(&manager.exprs, expr);
 				} else {
@@ -466,6 +509,7 @@ void numbers_solutions(
 
 	free(workers);
 
+	exprbuf_free_items(&uniq_solutions);
 	exprbuf_free_items(&manager.exprs);
 	sem_destroy(&manager.semaphore);
 }
@@ -476,7 +520,7 @@ void *worker_proc(void *arg) {
 	for (;;) {
 		if (sem_wait(&worker->semaphore) != 0) {
 			perror("worker waiting for work");
-			abort();
+			exit(1);
 		}
 
 		size_t lower = worker->lower;
@@ -503,7 +547,7 @@ void *worker_proc(void *arg) {
 
 		if (sem_post(&worker->manager->semaphore) != 0) {
 			perror("returning result to manager thread");
-			abort();
+			exit(1);
 		}
 	}
 

@@ -16,7 +16,7 @@ unsigned long parse_unsigned_long(const char *str, const char *errmsg) {
 	unsigned long size = strtoul(str, &endptr, 10);
 	if (!*str || *endptr) {
 		fprintf(stderr, "%s: %s\n", errmsg, str);
-		abort();
+		exit(1);
 	}
 	return size;
 }
@@ -39,18 +39,29 @@ int compare_unsigned_long(const void *lptr, const void *rptr) {
 int main(int argc, char* argv[]) {
 
 	if (argc < 4) {
-		fprintf(stderr, "not enough arbuments\n");
+		fprintf(stderr, "not enough arguments\n");
 		return 1;
 	}
 
 	const size_t tasks = parse_unsigned_long(argv[1], "number of tasks is not a number or out of range");
 	const unsigned long target = parse_unsigned_long(argv[2], "target is not a number or out of range");
 	const size_t count = (size_t)argc - 3;
+
+	if (tasks == 0) {
+		fprintf(stderr, "number of tasks has to be >= 1\n");
+		exit(1);
+	}
+
+	if (count > sizeof(size_t) * 8) {
+		fprintf(stderr, "only up to %lu numbers supported\n", sizeof(size_t) * 8);
+		exit(1);
+	}
+
 	unsigned long *numbers = calloc(count, sizeof(unsigned long));
 
 	if (!numbers) {
 		perror("allocating numbers array");
-		abort();
+		exit(1);
 	}
 
 	for (size_t index = 0; index < count; ++ index) {
@@ -59,6 +70,7 @@ int main(int argc, char* argv[]) {
 
 	qsort(numbers, count, sizeof(unsigned long), compare_unsigned_long);
 
+	printf("tasks = %zu\n", tasks);
 	printf("target = %lu\n", target);
 	printf("numbers = [%lu", numbers[0]);
 	for (size_t index = 1; index < count; ++ index) {
@@ -68,6 +80,8 @@ int main(int argc, char* argv[]) {
 	Context ctx;
 	ctx.count = 1;
 	numbers_solutions(tasks, target, numbers, count, callback, &ctx);
+
+	free(numbers);
 
 	return 0;
 }

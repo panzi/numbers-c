@@ -2,6 +2,7 @@
 #define NUMBERS_H
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,10 +38,10 @@ typedef struct ExprBufS {
 void expr_fprint(FILE *stream, const Expr *expr);
 
 void exprbuf_init(ExprBuf *buf);
-void exprbuf_swap(ExprBuf *left, ExprBuf *right);
 void exprbuf_add(ExprBuf *buf, Expr *expr);
 void exprbuf_free_buf(ExprBuf *buf);
 void exprbuf_free_elems(ExprBuf *buf);
+bool exprbuf_contains(const ExprBuf *buf, const Expr *expr);
 
 void numbers_solutions(
 	const size_t tasks, const unsigned long target, const unsigned long numbers[],
