@@ -142,7 +142,7 @@ void numbers_solutions(
 		size_t x_last = x0;
 		size_t i = 1;
 		const size_t x0_sq = x0 * x0;
-		const size_t area = (double)(xn * xn - x0_sq) / (double)tasks;
+		const double area = (double)(xn * xn - x0_sq) / (double)tasks;
 
 		while (x_last < xn || worker_count == 0) {
 			const size_t xi_ = (size_t)round(sqrt((double)i * area + (double)x0_sq));
