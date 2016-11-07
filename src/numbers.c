@@ -92,7 +92,7 @@ void numbers_solutions(
 		panice("initializing manager semaphore");
 	}
 
-	const unsigned long full_usage = ~(~0ul << count);
+	const size_t full_usage = ~(~0ul << count);
 
 	exprbuf_init(&manager.exprs);
 	exprbuf_init(&uniq_solutions);
