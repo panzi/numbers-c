@@ -4,3 +4,5 @@ build/*
 *~
 *.zip
 *.o
+perf.data
+perf.data.*
