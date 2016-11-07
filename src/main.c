@@ -102,8 +102,8 @@ int main(int argc, char* argv[]) {
 		printf(", %lu", numbers[index]);
 	}
 	printf("]\n\nsolutions:\n");
-	Context ctx;
-	ctx.count = 1;
+
+	Context ctx = { .count = 1 };
 	numbers_solutions(tasks, target, numbers, count, callback, &ctx);
 
 	free(numbers);
