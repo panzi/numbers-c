@@ -184,7 +184,7 @@ void expr_fprint_op(FILE *stream, char op, const Expr *expr) {
 
 #ifdef DEBUG
 void expr_fprint(FILE *stream, const Expr *expr) {
-	fprintf(stream, "(0x%lx)(", (uintptr_t)expr);
+	fprintf(stream, "(0x%zx)(", (uintptr_t)expr);
 	if (expr->op == OpVal) {
 		fprintf(stream, "%lu #%zu", expr->value, expr->u.index);
 	}
