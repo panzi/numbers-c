@@ -12,7 +12,7 @@ all: build/numbers
 build/numbers: $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) $(LIB) -o $@
 
-build/%.o: src/%.c
+build/%.o: src/%.c src/panic.h
 	$(CC) $(CFLAGS) $< -c -o $@
 
 clean:
