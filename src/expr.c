@@ -2,6 +2,7 @@
 #include "expr.h"
 
 #include <stdlib.h>
+#include <stdint.h>
 
 static void expr_fprint_op(FILE *stream, char op, const Expr *expr);
 
