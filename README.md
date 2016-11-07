@@ -13,6 +13,7 @@ Usage:
 
 ```
 ./build/numbers <threads> <target> [<number>...]
+./build/numbers - <target> [<number>...]
 ```
 
 Same program in other languages:

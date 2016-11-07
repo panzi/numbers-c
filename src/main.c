@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 
 #include "numbers.h"
 #include "panic.h"
@@ -11,6 +13,7 @@ typedef struct Context {
 static unsigned long parse_unsigned_long(const char *str, const char *errmsg);
 static void callback(void *arg, const Expr *expr);
 static int compare_unsigned_long(const void *lptr, const void *rptr);
+static size_t get_cpu_count();
 
 unsigned long parse_unsigned_long(const char *str, const char *errmsg) {
 	char *endptr = NULL;
@@ -36,14 +39,22 @@ int compare_unsigned_long(const void *lptr, const void *rptr) {
 	return l < r ? -1 : r < l ? 1 : 0;
 }
 
-int main(int argc, char* argv[]) {
+size_t get_cpu_count() {
+	const long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+	if (nprocs < 0) {
+		panice("getting number of CPUs/cores");
+	}
+	return (size_t)nprocs;
+}
 
+int main(int argc, char* argv[]) {
 	if (argc < 4) {
 		fprintf(stderr, "not enough arguments\n");
 		return 1;
 	}
 
-	const size_t tasks = parse_unsigned_long(argv[1], "number of tasks is not a number or out of range");
+	const size_t tasks = strcmp(argv[1], "-") == 0 ? get_cpu_count() :
+		parse_unsigned_long(argv[1], "number of tasks is not a number or out of range");
 	const unsigned long target = parse_unsigned_long(argv[2], "target is not a number or out of range");
 	const size_t count = (size_t)argc - 3;
 
