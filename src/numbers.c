@@ -242,14 +242,14 @@ void *worker_proc(void *arg) {
 			panice("worker waiting for work");
 		}
 
-		size_t lower = worker->lower;
-		size_t upper = worker->upper;
+		const size_t lower = worker->lower;
+		const size_t upper = worker->upper;
 
 		if (lower == upper) {
 			break;
 		}
 
-		Expr **exprs = worker->manager->exprs.buf;
+		Expr *const *const exprs = worker->manager->exprs.buf;
 		ExprBuf *new_exprs = (ExprBuf*)&worker->new_exprs;
 
 		for (size_t b = lower; b < upper; ++ b) {
