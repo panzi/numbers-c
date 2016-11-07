@@ -1,7 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
+
+#if defined(_WIN16) || defined(_WIN32) || defined(_WIN64)
+#define __WINDOWS__
+#endif
+
+#if !defined(__WINDOWS__)
+#include <unistd.h>
+#endif
 
 #include "numbers.h"
 #include "panic.h"
@@ -13,7 +20,10 @@ typedef struct Context {
 static unsigned long parse_unsigned_long(const char *str, const char *errmsg);
 static void callback(void *arg, const Expr *expr);
 static int compare_unsigned_long(const void *lptr, const void *rptr);
+
+#ifdef _SC_NPROCESSORS_ONLN
 static size_t get_cpu_count();
+#endif
 
 unsigned long parse_unsigned_long(const char *str, const char *errmsg) {
 	char *endptr = NULL;
@@ -39,6 +49,7 @@ int compare_unsigned_long(const void *lptr, const void *rptr) {
 	return l < r ? -1 : r < l ? 1 : 0;
 }
 
+#ifdef _SC_NPROCESSORS_ONLN
 size_t get_cpu_count() {
 	const long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
 	if (nprocs < 0) {
@@ -46,6 +57,7 @@ size_t get_cpu_count() {
 	}
 	return (size_t)nprocs;
 }
+#endif
 
 int main(int argc, char* argv[]) {
 	if (argc < 4) {
@@ -53,8 +65,13 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
+#ifdef _SC_NPROCESSORS_ONLN
 	const size_t tasks = strcmp(argv[1], "-") == 0 ? get_cpu_count() :
+#else
+	const size_t tasks =
+#endif
 		parse_unsigned_long(argv[1], "number of tasks is not a number or out of range");
+
 	const unsigned long target = parse_unsigned_long(argv[2], "target is not a number or out of range");
 	const size_t count = (size_t)argc - 3;
 
