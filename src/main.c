@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "numbers.h"
+#include "panic.h"
 
 typedef struct Context {
 	size_t count;
@@ -15,8 +16,7 @@ unsigned long parse_unsigned_long(const char *str, const char *errmsg) {
 	char *endptr = NULL;
 	unsigned long size = strtoul(str, &endptr, 10);
 	if (!*str || *endptr) {
-		fprintf(stderr, "%s: %s\n", errmsg, str);
-		exit(1);
+		panicf("%s: %s", errmsg, str);
 	}
 	return size;
 }
@@ -48,20 +48,17 @@ int main(int argc, char* argv[]) {
 	const size_t count = (size_t)argc - 3;
 
 	if (tasks == 0) {
-		fprintf(stderr, "number of tasks has to be >= 1\n");
-		exit(1);
+		panicf("number of tasks has to be >= 1");
 	}
 
 	if (count > sizeof(size_t) * 8) {
-		fprintf(stderr, "only up to %lu numbers supported\n", sizeof(size_t) * 8);
-		exit(1);
+		panicf("only up to %lu numbers supported", sizeof(size_t) * 8);
 	}
 
 	unsigned long *numbers = calloc(count, sizeof(unsigned long));
 
 	if (!numbers) {
-		perror("allocating numbers array");
-		exit(1);
+		panice("allocating numbers array");
 	}
 
 	for (size_t index = 0; index < count; ++ index) {

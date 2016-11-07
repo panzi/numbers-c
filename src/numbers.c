@@ -1,4 +1,6 @@
 #include "numbers.h"
+#include "exprbuf.h"
+#include "panic.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,103 +25,8 @@ typedef struct Worker {
 	Manager *manager;
 } Worker;
 
-static Expr *new_val(unsigned long value, size_t index);
-static Expr *new_expr(Op op, const Expr *left, const Expr *right);
-static bool expr_equals(const Expr *left, const Expr *right);
-
 static void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b);
-
-static bool is_normalized_add(const Expr *left, const Expr *right);
-static bool is_normalized_sub(const Expr *left, const Expr *right);
-static bool is_normalized_mul(const Expr *left, const Expr *right);
-static bool is_normalized_div(const Expr *left, const Expr *right);
-
-static void expr_fprint_op(FILE *stream, char op, const Expr *expr);
-
 static void *worker_proc(void *arg);
-
-Expr *new_val(unsigned long value, size_t index) {
-	Expr *expr = malloc(sizeof(Expr));
-
-	if (!expr) {
-		perror("allocating new value");
-		exit(1);
-	}
-
-	expr->op = OpVal;
-	expr->u.index = index;
-	expr->value = value;
-	expr->used = 1 << index;
-
-	return expr;
-}
-
-Expr *new_expr(Op op, const Expr *left, const Expr *right) {
-	Expr *expr = malloc(sizeof(Expr));
-
-	if (!expr) {
-		perror("allocating new expression");
-		exit(1);
-	}
-
-	expr->op = op;
-	expr->u.e.left  = left;
-	expr->u.e.right = right;
-
-	switch (op) {
-	case OpAdd:
-		expr->value = left->value + right->value;
-		break;
-
-	case OpSub:
-		expr->value = left->value - right->value;
-		break;
-
-	case OpMul:
-		expr->value = left->value * right->value;
-		break;
-
-	case OpDiv:
-		expr->value = left->value / right->value;
-		break;
-
-	default:
-		fprintf(stderr, "illegal operation\n");
-		exit(1);
-	}
-
-	expr->used = left->used | right->used;
-
-	return expr;
-}
-
-bool expr_equals(const Expr *left, const Expr *right) {
-	if (left == right) {
-		return true;
-	}
-
-	if (left->op != right->op || left->value != right->value) {
-		return false;
-	}
-
-	if (left->op != OpVal) {
-		if (!expr_equals(left->u.e.left, right->u.e.left) || !expr_equals(left->u.e.right, right->u.e.right)) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-bool exprbuf_contains(const ExprBuf *buf, const Expr *expr) {
-	for (size_t index = 0; index < buf->size; ++ index) {
-		const Expr *other = buf->buf[index];
-		if (expr_equals(expr, other)) {
-			return true;
-		}
-	}
-	return false;
-}
 
 void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b) {
 	if (is_normalized_add(a, b)) {
@@ -166,205 +73,23 @@ void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b) {
 	}
 }
 
-void exprbuf_init(ExprBuf *buf) {
-	buf->capacity = 32;
-	buf->size = 0;
-	buf->buf = calloc(buf->capacity, sizeof(Expr));
-
-	if (!buf->buf) {
-		perror("allocating expression buffer");
-		exit(1);
-	}
-}
-
-void exprbuf_add(ExprBuf *buf, Expr *expr) {
-	if (buf->size == buf->capacity) {
-		if (SIZE_MAX / 2 < buf->capacity) {
-			fprintf(stderr, "integer overflow\n");
-			exit(1);
-		}
-		const size_t capacity = buf->capacity == 0 ? 32 : buf->capacity * 2;
-		buf->buf = realloc(buf->buf, capacity * sizeof(Expr));
-		buf->capacity = capacity;
-		if (!buf->buf) {
-			perror("resizing expression buffer");
-			exit(1);
-		}
-	}
-
-	buf->buf[buf->size] = expr;
-	buf->size ++;
-}
-
-void exprbuf_free_buf(ExprBuf *buf) {
-	free(buf->buf);
-	buf->buf      = NULL;
-	buf->size     = 0;
-	buf->capacity = 0;
-}
-
-void exprbuf_free_items(ExprBuf *buf) {
-	for (size_t index = 0; index < buf->size; ++ index) {
-		free(buf->buf[index]);
-	}
-	exprbuf_free_buf(buf);
-}
-
-bool is_normalized_add(const Expr *left, const Expr *right) {
-	switch (right->op) {
-		case OpAdd:
-		case OpSub:
-			return false;
-
-		default:
-			switch (left->op) {
-				case OpAdd: return left->u.e.right->value <= right->value;
-				case OpSub: return false;
-				default:    return left->value <= right->value;
-			}
-	}
-}
-
-bool is_normalized_sub(const Expr *left, const Expr *right) {
-	switch (right->op) {
-		case OpAdd:
-		case OpSub:
-			return false;
-
-		default:
-			switch (left->op) {
-				case OpSub: return left->u.e.right->value <= right->value;
-				default:    return true;
-			}
-	}
-}
-
-bool is_normalized_mul(const Expr *left, const Expr *right) {
-	switch (right->op) {
-		case OpMul:
-		case OpDiv:
-			return false;
-
-		default:
-			switch (left->op) {
-				case OpMul: return left->u.e.right->value <= right->value;
-				case OpDiv: return false;
-				default:    return left->value <= right->value;
-			}
-	}
-}
-
-bool is_normalized_div(const Expr *left, const Expr *right) {
-	switch (right->op) {
-		case OpMul:
-		case OpDiv:
-			return false;
-
-		default:
-			switch (left->op) {
-				case OpDiv: return left->u.e.right->value <= right->value;
-				default:    return true;
-			}
-	}
-}
-
-void expr_fprint_op(FILE *stream, char op, const Expr *expr) {
-	// op equals to it's precedence
-	const int p = expr->op;
-	const int lp = expr->u.e.left->op;
-	const int rp = expr->u.e.right->op;
-
-	if (p > lp) {
-		if (p > rp) {
-			fputc('(', stream);
-			expr_fprint(stream, expr->u.e.left);
-			fputc(')', stream);
-
-			printf(" %c ", op);
-
-			fputc('(', stream);
-			expr_fprint(stream, expr->u.e.right);
-			fputc(')', stream);
-		}
-		else {
-			fputc('(', stream);
-			expr_fprint(stream, expr->u.e.left);
-			fputc(')', stream);
-
-			printf(" %c ", op);
-
-			expr_fprint(stream, expr->u.e.right);
-		}
-	}
-	else {
-		if (p > rp) {
-			expr_fprint(stream, expr->u.e.left);
-
-			printf(" %c ", op);
-
-			fputc('(', stream);
-			expr_fprint(stream, expr->u.e.right);
-			fputc(')', stream);
-		}
-		else {
-			expr_fprint(stream, expr->u.e.left);
-
-			printf(" %c ", op);
-
-			expr_fprint(stream, expr->u.e.right);
-		}
-	}
-}
-
-#if 1
-void expr_fprint(FILE *stream, const Expr *expr) {
-	switch (expr->op) {
-		case OpAdd: expr_fprint_op(stream, '+', expr); break;
-		case OpSub: expr_fprint_op(stream, '-', expr); break;
-		case OpMul: expr_fprint_op(stream, '*', expr); break;
-		case OpDiv: expr_fprint_op(stream, '/', expr); break;
-		case OpVal: fprintf(stream, "%lu", expr->value); break;
-	}
-}
-#else
-void expr_fprint(FILE *stream, const Expr *expr) {
-	fprintf(stream, "(0x%lx)(", (uintptr_t)expr);
-	if (expr->op == OpVal) {
-		fprintf(stream, "%lu #%zu", expr->value, expr->u.index);
-	}
-	else {
-		switch (expr->op) {
-			case OpAdd: expr_fprint_op(stream, '+', expr); break;
-			case OpSub: expr_fprint_op(stream, '-', expr); break;
-			case OpMul: expr_fprint_op(stream, '*', expr); break;
-			case OpDiv: expr_fprint_op(stream, '/', expr); break;
-			case OpVal: break;
-		}
-	}
-	fprintf(stream, ")");
-}
-#endif
-
 void numbers_solutions(
 	const size_t tasks, const unsigned long target, const unsigned long numbers[],
 	const size_t count, void (*callback)(void*, const Expr*), void *arg) {
 
 	if (tasks == 0) {
-		fprintf(stderr, "number of tasks has to be >= 1\n");
-		exit(1);
+		panicf("number of tasks has to be >= 1");
 	}
 
 	if (count > sizeof(size_t) * 8) {
-		fprintf(stderr, "only up to %lu numbers supported\n", sizeof(size_t) * 8);
-		exit(1);
+		panicf("only up to %lu numbers supported", sizeof(size_t) * 8);
 	}
 
 	Manager manager;
 	ExprBuf uniq_solutions;
 
 	if (sem_init(&manager.semaphore, 0, 0) != 0) {
-		perror("initializing manager semaphore");
-		exit(1);
+		panice("initializing manager semaphore");
 	}
 
 	const unsigned long full_usage = ~(~0ul << count);
@@ -374,8 +99,7 @@ void numbers_solutions(
 
 	Worker *workers = calloc(tasks, sizeof(Worker));
 	if (!workers) {
-		perror("allocating workers array");
-		exit(1);
+		panice("allocating workers array");
 	}
 
 	for (size_t index = 0; index < tasks; ++ index) {
@@ -384,8 +108,7 @@ void numbers_solutions(
 		worker->manager = &manager;
 
 		if (sem_init(&worker->semaphore, 0, 0) != 0) {
-			perror("initializing worker semaphore");
-			exit(1);
+			panice("initializing worker semaphore");
 		}
 	}
 
@@ -405,8 +128,7 @@ void numbers_solutions(
 		Worker *worker = &workers[index];
 		const int errnum = pthread_create(&worker->thread, NULL, &worker_proc, worker);
 		if (errnum != 0) {
-			fprintf(stderr, "starting worker therad: %s\n", strerror(errnum));
-			exit(1);
+			panicf("starting worker therad: %s", strerror(errnum));
 		}
 	}
 
@@ -428,8 +150,7 @@ void numbers_solutions(
 
 			if (xi > x_last) {
 				if (worker_count >= tasks) {
-					fprintf(stderr, "calculating worker count: more workers than requested tasks\n");
-					exit(1);
+					panicf("calculating worker count: more workers than requested tasks");
 				}
 				const size_t xim1 = x_last;
 
@@ -438,8 +159,7 @@ void numbers_solutions(
 				worker->upper = xi;
 
 				if (sem_post(&worker->semaphore) != 0) {
-					perror("sending work to worker thread");
-					exit(1);
+					panice("sending work to worker thread");
 				}
 
 				x_last = xi;
@@ -449,15 +169,15 @@ void numbers_solutions(
 			++ i;
 		}
 
+#ifdef DEBUG
 		if (worker_count == 0) {
-			fprintf(stderr, "BUG: no worker created\n");
-			exit(1);
+			panicf("BUG: no worker created");
 		}
+#endif
 
 		for (size_t finished = 0; finished < worker_count; ++ finished) {
 			if (sem_wait(&manager.semaphore) != 0) {
-				perror("waiting for worker thread");
-				exit(1);
+				panice("waiting for worker thread");
 			}
 		}
 
@@ -519,8 +239,7 @@ void *worker_proc(void *arg) {
 
 	for (;;) {
 		if (sem_wait(&worker->semaphore) != 0) {
-			perror("worker waiting for work");
-			exit(1);
+			panice("worker waiting for work");
 		}
 
 		size_t lower = worker->lower;
@@ -546,8 +265,7 @@ void *worker_proc(void *arg) {
 		}
 
 		if (sem_post(&worker->manager->semaphore) != 0) {
-			perror("returning result to manager thread");
-			exit(1);
+			panice("returning result to manager thread");
 		}
 	}
 
