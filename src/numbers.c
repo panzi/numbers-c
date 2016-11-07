@@ -231,7 +231,10 @@ void numbers_solutions(
 
 	exprbuf_free_items(&uniq_solutions);
 	exprbuf_free_items(&manager.exprs);
-	sem_destroy(&manager.semaphore);
+
+	if (sem_destroy(&manager.semaphore) != 0) {
+		perror("destroying manager semaphore");
+	}
 }
 
 void *worker_proc(void *arg) {
