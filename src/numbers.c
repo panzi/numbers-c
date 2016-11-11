@@ -257,11 +257,13 @@ void *worker_proc(void *arg) {
 
 		for (size_t b = lower; b < upper; ++ b) {
 			const Expr *bexpr = exprs[b];
+			const size_t bused = bexpr->used;
 
 			for (size_t a = 0; a < b; ++ a) {
 				const Expr *aexpr = exprs[a];
+				const size_t aused = aexpr->used;
 
-				if ((aexpr->used & bexpr->used) == 0) {
+				if ((aused & bused) == 0) {
 					make_exprs(new_exprs, aexpr, bexpr);
 				}
 			}
