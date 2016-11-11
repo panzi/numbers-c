@@ -105,6 +105,9 @@ int main(int argc, char* argv[]) {
 
 	Context ctx = { .count = 1 };
 	numbers_solutions(tasks, target, numbers, count, callback, &ctx);
+	if (ctx.count == 1) {
+		puts("no solutions found");
+	}
 
 	free(numbers);
 
