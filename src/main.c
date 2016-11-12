@@ -60,7 +60,7 @@ size_t get_cpu_count() {
 #endif
 
 int main(int argc, char* argv[]) {
-	if (argc < 4) {
+	if (argc < 3) {
 		fprintf(stderr, "not enough arguments\n");
 		return 1;
 	}
@@ -97,9 +97,14 @@ int main(int argc, char* argv[]) {
 
 	printf("tasks = %zu\n", tasks);
 	printf("target = %lu\n", target);
-	printf("numbers = [%lu", numbers[0]);
-	for (size_t index = 1; index < count; ++ index) {
-		printf(", %lu", numbers[index]);
+	if (count == 0) {
+		printf("numbers = [");
+	}
+	else {
+		printf("numbers = [%lu", numbers[0]);
+		for (size_t index = 1; index < count; ++ index) {
+			printf(", %lu", numbers[index]);
+		}
 	}
 	printf("]\n\nsolutions:\n");
 

@@ -83,10 +83,6 @@ void numbers_solutions(
 		panicf("number of tasks has to be >= 1");
 	}
 
-	if (count == 0) {
-		panicf("you need to supply at least one number");
-	}
-
 	if (count > sizeof(size_t) * 8) {
 		panicf("only up to %lu numbers supported", sizeof(size_t) * 8);
 	}
