@@ -257,6 +257,9 @@ void numbers_solutions(
 
 void *worker_proc(void *arg) {
 	Worker *worker = (Worker*)arg;
+	Manager *manager = worker->manager;
+	const ExprBuf *segments = manager->segments;
+	const size_t segment_count = manager->segment_count;
 
 	for (;;) {
 		if (sem_wait(&worker->semaphore) != 0) {
@@ -270,9 +273,7 @@ void *worker_proc(void *arg) {
 			break;
 		}
 
-		Expr *const *const exprs = worker->manager->exprs.buf;
-		const ExprBuf *segments = worker->manager->segments;
-		const size_t segment_count = worker->manager->segment_count;
+		Expr *const *const exprs = manager->exprs.buf;
 		ExprBuf *new_exprs = (ExprBuf*)&worker->new_exprs;
 
 		for (size_t b = lower; b < upper; ++ b) {
@@ -293,7 +294,7 @@ void *worker_proc(void *arg) {
 			}
 		}
 
-		if (sem_post(&worker->manager->semaphore) != 0) {
+		if (sem_post(&manager->semaphore) != 0) {
 			panice("returning result to manager thread");
 		}
 	}
