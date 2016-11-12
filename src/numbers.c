@@ -11,12 +11,14 @@
 #include <semaphore.h>
 #include <math.h>
 
-typedef struct Manager {
+typedef struct ManagerS {
 	sem_t semaphore;
 	ExprBuf exprs;
+	ExprBuf *segments;
+	size_t   segment_count;
 } Manager;
 
-typedef struct Worker {
+typedef struct WorkerS {
 	pthread_t thread;
 	volatile ExprBuf new_exprs;
 	volatile size_t lower;
@@ -81,6 +83,10 @@ void numbers_solutions(
 		panicf("number of tasks has to be >= 1");
 	}
 
+	if (count == 0) {
+		panicf("you need to supply at least one number");
+	}
+
 	if (count > sizeof(size_t) * 8) {
 		panicf("only up to %lu numbers supported", sizeof(size_t) * 8);
 	}
@@ -96,6 +102,13 @@ void numbers_solutions(
 
 	exprbuf_init(&manager.exprs);
 	exprbuf_init(&uniq_solutions);
+
+	manager.segment_count = full_usage;
+	manager.segments = calloc(manager.segment_count, sizeof(ExprBuf));
+
+	if (!manager.segments) {
+		panice("allocating segments array");
+	}
 
 	Worker *workers = calloc(tasks, sizeof(Worker));
 	if (!workers) {
@@ -113,7 +126,9 @@ void numbers_solutions(
 	}
 
 	for (size_t index = 0; index < count; ++ index) {
-		exprbuf_add(&manager.exprs, new_val(numbers[index], index));
+		Expr *expr = new_val(numbers[index], index);
+		exprbuf_add(&manager.exprs, expr);
+		exprbuf_add(&manager.segments[expr->used - 1], expr);
 	}
 
 	for (size_t index = 0; index < count; ++ index) {
@@ -195,6 +210,7 @@ void numbers_solutions(
 					}
 				} else if (expr->used != full_usage) {
 					exprbuf_add(&manager.exprs, expr);
+					exprbuf_add(&manager.segments[expr->used - 1], expr);
 				} else {
 					free(expr);
 				}
@@ -229,6 +245,12 @@ void numbers_solutions(
 
 	free(workers);
 
+	for (size_t index = 0; index < manager.segment_count; ++ index) {
+		exprbuf_free_buf(&manager.segments[index]);
+	}
+
+	free(manager.segments);
+
 	exprbuf_free_items(&uniq_solutions);
 	exprbuf_free_items(&manager.exprs);
 
@@ -253,18 +275,24 @@ void *worker_proc(void *arg) {
 		}
 
 		Expr *const *const exprs = worker->manager->exprs.buf;
+		const ExprBuf *segments = worker->manager->segments;
+		const size_t segment_count = worker->manager->segment_count;
 		ExprBuf *new_exprs = (ExprBuf*)&worker->new_exprs;
 
 		for (size_t b = lower; b < upper; ++ b) {
 			const Expr *bexpr = exprs[b];
 			const size_t bused = bexpr->used;
 
-			for (size_t a = 0; a < b; ++ a) {
-				const Expr *aexpr = exprs[a];
-				const size_t aused = aexpr->used;
-
+			for (size_t aused = 1; aused <= segment_count; ++ aused) {
 				if ((aused & bused) == 0) {
-					make_exprs(new_exprs, aexpr, bexpr);
+					const ExprBuf *segment = &segments[aused - 1];
+					Expr *const *const buf = segment->buf;
+					const size_t segment_size = segment->size;
+
+					for (size_t index = 0; index < segment_size; ++ index) {
+						const Expr *aexpr = buf[index];
+						make_exprs(new_exprs, aexpr, bexpr);
+					}
 				}
 			}
 		}
