@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 void numbers_solutions(
-	const size_t tasks, const unsigned long target, const unsigned long numbers[],
+	const size_t tasks, const Number target, const Number numbers[],
 	const size_t count, void (*callback)(void*, const Expr*), void *arg);
 
 #ifdef __cplusplus

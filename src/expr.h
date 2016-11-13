@@ -17,6 +17,11 @@ typedef enum OpE {
 	OpVal = 4
 } Op;
 
+typedef unsigned long Number;
+typedef size_t NumberSet;
+
+#define PRIN "%lu"
+
 typedef struct ExprS {
 	Op op;
 	union {
@@ -26,11 +31,11 @@ typedef struct ExprS {
 		} e;
 		size_t index;
 	} u;
-	unsigned long value;
-	size_t used;
+	Number value;
+	NumberSet used;
 } Expr;
 
-Expr *new_val(unsigned long value, size_t index);
+Expr *new_val(Number value, size_t index);
 Expr *new_expr(Op op, const Expr *left, const Expr *right);
 
 bool expr_equals(const Expr *left, const Expr *right);

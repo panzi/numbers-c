@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 #define EXPRBUF_INIT_CAPACITY 64
+#define EXPRBUF_INIT { .buf = NULL, .size = 0, .capacity = 0 }
 
 typedef struct ExprBufS {
 	Expr **buf;
@@ -15,7 +16,6 @@ typedef struct ExprBufS {
 	size_t capacity;
 } ExprBuf;
 
-void exprbuf_init(ExprBuf *buf);
 void exprbuf_add(ExprBuf *buf, Expr *expr);
 bool exprbuf_contains(const ExprBuf *buf, const Expr *expr);
 void exprbuf_free_buf(ExprBuf *buf);

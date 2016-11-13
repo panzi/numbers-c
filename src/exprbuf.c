@@ -4,16 +4,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-void exprbuf_init(ExprBuf *buf) {
-	buf->capacity = EXPRBUF_INIT_CAPACITY;
-	buf->size = 0;
-	buf->buf = calloc(buf->capacity, sizeof(Expr));
-
-	if (!buf->buf) {
-		panice("allocating expression buffer");
-	}
-}
-
 void exprbuf_add(ExprBuf *buf, Expr *expr) {
 	if (buf->size == buf->capacity) {
 		if (SIZE_MAX / 2 < buf->capacity) {

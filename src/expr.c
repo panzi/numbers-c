@@ -6,7 +6,7 @@
 
 static void expr_fprint_op(FILE *stream, char op, const Expr *expr);
 
-Expr *new_val(unsigned long value, size_t index) {
+Expr *new_val(Number value, size_t index) {
 	Expr *expr = malloc(sizeof(Expr));
 
 	if (!expr) {
@@ -190,7 +190,7 @@ void expr_fprint(FILE *stream, const Expr *expr) {
 		case OpSub: expr_fprint_op(stream, '-', expr); break;
 		case OpMul: expr_fprint_op(stream, '*', expr); break;
 		case OpDiv: expr_fprint_op(stream, '/', expr); break;
-		case OpVal: fprintf(stream, "%lu #%zu", expr->value, expr->u.index); break;
+		case OpVal: fprintf(stream, PRIN " #%zu", expr->value, expr->u.index); break;
 	}
 	fprintf(stream, ")");
 }
@@ -201,7 +201,7 @@ void expr_fprint(FILE *stream, const Expr *expr) {
 		case OpSub: expr_fprint_op(stream, '-', expr); break;
 		case OpMul: expr_fprint_op(stream, '*', expr); break;
 		case OpDiv: expr_fprint_op(stream, '/', expr); break;
-		case OpVal: fprintf(stream, "%lu", expr->value); break;
+		case OpVal: fprintf(stream, PRIN, expr->value); break;
 	}
 }
 #endif

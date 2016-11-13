@@ -15,7 +15,7 @@ typedef struct ManagerS {
 	sem_t semaphore;
 	ExprBuf exprs;
 	ExprBuf *segments;
-	size_t   segment_count;
+	NumberSet segment_count;
 } Manager;
 
 typedef struct WorkerS {
@@ -31,6 +31,9 @@ static void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b);
 static void *worker_proc(void *arg);
 
 void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b) {
+	const Number avalue = a->value;
+	const Number bvalue = b->value;
+
 	if (is_normalized_add(a, b)) {
 		exprbuf_add(exprs, new_expr(OpAdd, a, b));
 	}
@@ -38,7 +41,7 @@ void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b) {
 		exprbuf_add(exprs, new_expr(OpAdd, b, a));
 	}
 
-	if (a->value != 1 && b->value != 1) {
+	if (avalue != 1 && bvalue != 1) {
 		if (is_normalized_mul(a, b)) {
 			exprbuf_add(exprs, new_expr(OpMul, a, b));
 		}
@@ -47,25 +50,25 @@ void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b) {
 		}
 	}
 
-	if (a->value > b->value) {
+	if (avalue > bvalue) {
 		if (is_normalized_sub(a, b)) {
 			exprbuf_add(exprs, new_expr(OpSub, a, b));
 		}
 
-		if (b->value != 1 && (a->value % b->value) == 0 && is_normalized_div(a, b)) {
+		if (bvalue != 1 && (avalue % bvalue) == 0 && is_normalized_div(a, b)) {
 			exprbuf_add(exprs, new_expr(OpDiv, a, b));
 		}
 	}
-	else if (b->value > a->value) {
+	else if (bvalue > avalue) {
 		if (is_normalized_sub(b, a)) {
 			exprbuf_add(exprs, new_expr(OpSub, b, a));
 		}
 
-		if (a->value != 1 && (b->value % a->value) == 0 && is_normalized_div(b, a)) {
+		if (avalue != 1 && (bvalue % avalue) == 0 && is_normalized_div(b, a)) {
 			exprbuf_add(exprs, new_expr(OpDiv, b, a));
 		}
 	}
-	else if (b->value != 1) {
+	else if (avalue == bvalue && bvalue != 1) {
 		if (is_normalized_div(a, b)) {
 			exprbuf_add(exprs, new_expr(OpDiv, a, b));
 		}
@@ -76,34 +79,31 @@ void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b) {
 }
 
 void numbers_solutions(
-	const size_t tasks, const unsigned long target, const unsigned long numbers[],
+	const size_t tasks, const Number target, const Number numbers[],
 	const size_t count, void (*callback)(void*, const Expr*), void *arg) {
 
 	if (tasks == 0) {
 		panicf("number of tasks has to be >= 1");
 	}
 
-	if (count > sizeof(size_t) * 8) {
-		panicf("only up to %lu numbers supported", sizeof(size_t) * 8);
+	if (count > sizeof(NumberSet) * 8) {
+		panicf("only up to %zu numbers supported", sizeof(NumberSet) * 8);
 	}
 
-	Manager manager;
-	ExprBuf uniq_solutions;
-
-	if (sem_init(&manager.semaphore, 0, 0) != 0) {
-		panice("initializing manager semaphore");
-	}
-
-	const size_t full_usage = ~(~0ul << count);
-
-	exprbuf_init(&manager.exprs);
-	exprbuf_init(&uniq_solutions);
-
-	manager.segment_count = full_usage;
-	manager.segments = calloc(manager.segment_count, sizeof(ExprBuf));
+	const NumberSet full_usage = ~(~0ul << count);
+	ExprBuf uniq_solutions = EXPRBUF_INIT;
+	Manager manager = {
+		.exprs = EXPRBUF_INIT,
+		.segments = calloc(full_usage, sizeof(ExprBuf)),
+		.segment_count = full_usage
+	};
 
 	if (!manager.segments) {
 		panice("allocating segments array");
+	}
+
+	if (sem_init(&manager.semaphore, 0, 0) != 0) {
+		panice("initializing manager semaphore");
 	}
 
 	Worker *workers = calloc(tasks, sizeof(Worker));
@@ -113,7 +113,6 @@ void numbers_solutions(
 
 	for (size_t index = 0; index < tasks; ++ index) {
 		Worker *worker = &workers[index];
-		exprbuf_init((ExprBuf*)&worker->new_exprs);
 		worker->manager = &manager;
 
 		if (sem_init(&worker->semaphore, 0, 0) != 0) {
@@ -122,7 +121,11 @@ void numbers_solutions(
 	}
 
 	for (size_t index = 0; index < count; ++ index) {
-		Expr *expr = new_val(numbers[index], index);
+		const Number number = numbers[index];
+		if (number == 0) {
+			panicf("given numbers may not be 0");
+		}
+		Expr *expr = new_val(number, index);
 		exprbuf_add(&manager.exprs, expr);
 		exprbuf_add(&manager.segments[expr->used - 1], expr);
 	}
@@ -145,6 +148,9 @@ void numbers_solutions(
 
 	size_t lower = 0;
 	size_t upper = count;
+#ifdef DEBUG
+	size_t collisions = 0;
+#endif
 
 	while (lower < upper) {
 		size_t worker_count = 0;
@@ -202,6 +208,9 @@ void numbers_solutions(
 						callback(arg, expr);
 					}
 					else {
+#ifdef DEBUG
+						++ collisions;
+#endif
 						free(expr);
 					}
 				} else if (expr->used != full_usage) {
@@ -217,6 +226,10 @@ void numbers_solutions(
 		lower = upper;
 		upper = manager.exprs.size;
 	}
+
+#ifdef DEBUG
+	printf("collisions: %zu\n", collisions);
+#endif
 
 	for (size_t index = 0; index < tasks; ++ index) {
 		Worker *worker = &workers[index];
@@ -241,7 +254,7 @@ void numbers_solutions(
 
 	free(workers);
 
-	for (size_t index = 0; index < manager.segment_count; ++ index) {
+	for (NumberSet index = 0; index < manager.segment_count; ++ index) {
 		exprbuf_free_buf(&manager.segments[index]);
 	}
 
@@ -259,7 +272,7 @@ void *worker_proc(void *arg) {
 	Worker *worker = (Worker*)arg;
 	Manager *manager = worker->manager;
 	const ExprBuf *segments = manager->segments;
-	const size_t segment_count = manager->segment_count;
+	const NumberSet segment_count = manager->segment_count;
 
 	for (;;) {
 		if (sem_wait(&worker->semaphore) != 0) {
@@ -278,9 +291,9 @@ void *worker_proc(void *arg) {
 
 		for (size_t b = lower; b < upper; ++ b) {
 			const Expr *bexpr = exprs[b];
-			const size_t bused = bexpr->used;
+			const NumberSet bused = bexpr->used;
 
-			for (size_t aused = 1; aused <= segment_count; ++ aused) {
+			for (NumberSet aused = 1; aused <= segment_count; ++ aused) {
 				if ((aused & bused) == 0) {
 					const ExprBuf *segment = &segments[aused - 1];
 					Expr *const *const buf = segment->buf;
