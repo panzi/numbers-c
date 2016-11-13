@@ -154,41 +154,33 @@ void numbers_solutions(
 
 	while (lower < upper) {
 		size_t worker_count = 0;
-		const size_t x0 = lower;
-		const size_t xn = upper;
-		size_t x_last = x0;
-		size_t i = 1;
-		const size_t x0_sq = x0 * x0;
-		const double area = (double)(xn * xn - x0_sq) / (double)tasks;
+		// ceiling integer division
+		const size_t task_size = 1 + ((upper - lower - 1) / tasks);
+		size_t prev_upper = lower;
 
-		while (x_last < xn || worker_count == 0) {
-			const size_t xi_ = (size_t)round(sqrt((double)i * area + (double)x0_sq));
-			const size_t xi = xi_ > xn ? xn : xi_;
+		while (prev_upper < upper) {
+#ifdef DEBUG
+			if (worker_count >= tasks) {
+				panicf("BUG: calculating worker count: more workers than requested tasks");
+			}
+#endif
+			const size_t task_upper = upper - task_size < prev_upper ?
+				upper : prev_upper + task_size;
+			Worker *worker = &workers[worker_count];
+			worker->lower = prev_upper;
+			worker->upper = task_upper;
 
-			if (xi > x_last) {
-				if (worker_count >= tasks) {
-					panicf("calculating worker count: more workers than requested tasks");
-				}
-				const size_t xim1 = x_last;
-
-				Worker *worker = &workers[worker_count];
-				worker->lower = xim1;
-				worker->upper = xi;
-
-				if (sem_post(&worker->semaphore) != 0) {
-					panice("sending work to worker thread");
-				}
-
-				x_last = xi;
-				++ worker_count;
+			if (sem_post(&worker->semaphore) != 0) {
+				panice("sending work to worker thread");
 			}
 
-			++ i;
+			++ worker_count;
+			prev_upper = task_upper;
 		}
 
 #ifdef DEBUG
 		if (worker_count == 0) {
-			panicf("BUG: no worker created");
+			panicf("BUG: no workers created");
 		}
 #endif
 
