@@ -246,7 +246,6 @@ void numbers_solutions(
 		if (errnum != 0) {
 			fprintf(stderr, "wating for worker thread to end: %s\n", strerror(errnum));
 		}
-		exprbuf_free_buf((ExprBuf*)&worker->new_exprs);
 		if (sem_destroy(&worker->semaphore) != 0) {
 			perror("destroying worker semaphore");
 		}
@@ -282,12 +281,14 @@ void *worker_proc(void *arg) {
 		const size_t lower = worker->lower;
 		const size_t upper = worker->upper;
 
+		ExprBuf *new_exprs = (ExprBuf*)&worker->new_exprs;
+
 		if (lower == upper) {
+			exprbuf_free_buf(new_exprs);
 			break;
 		}
 
 		Expr *const *const exprs = manager->exprs.buf;
-		ExprBuf *new_exprs = (ExprBuf*)&worker->new_exprs;
 
 		for (size_t b = lower; b < upper; ++ b) {
 			const Expr *bexpr = exprs[b];
