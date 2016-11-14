@@ -67,7 +67,7 @@ void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b) {
 			exprbuf_add(exprs, new_expr(OpDiv, b, a));
 		}
 	}
-	else if (avalue == bvalue && bvalue != 1) {
+	else if (bvalue != 1) {
 		if (is_normalized_div(a, b)) {
 			exprbuf_add(exprs, new_expr(OpDiv, a, b));
 		}
