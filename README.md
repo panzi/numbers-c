@@ -93,11 +93,9 @@ array of expressions. Put new expressions also in the corresponding array and
 then in the combination step only look at those sets that are fully distinct to
 the current expression.
 
-The next optimization is to split each iteration into parts that can be executed
-in parallel on a multicore system.
-
-TODO: Write down how the task sizes (bounds) are calculated to be as fair as
-possible.
+The next optimization is to split the expressions generated in the previous
+iteration into equally sized parts and combine them with all the previous
+expressions in parallel threads, one thread per CPU core.
 
 ### Normalization Rules
 
