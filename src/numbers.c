@@ -52,20 +52,20 @@ void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b, const size_t gener
 	}
 
 	if (avalue > bvalue) {
-		if (is_normalized_sub(a, b)) {
+		if (is_normalized_sub(a, b) && avalue - bvalue != bvalue) {
 			exprbuf_add(exprs, new_expr(OpSub, a, b, generation));
 		}
 
-		if (bvalue != 1 && (avalue % bvalue) == 0 && is_normalized_div(a, b)) {
+		if (bvalue != 1 && (avalue % bvalue) == 0 && avalue / bvalue != bvalue && is_normalized_div(a, b)) {
 			exprbuf_add(exprs, new_expr(OpDiv, a, b, generation));
 		}
 	}
 	else if (bvalue > avalue) {
-		if (is_normalized_sub(b, a)) {
+		if (is_normalized_sub(b, a) && bvalue - avalue != avalue) {
 			exprbuf_add(exprs, new_expr(OpSub, b, a, generation));
 		}
 
-		if (avalue != 1 && (bvalue % avalue) == 0 && is_normalized_div(b, a)) {
+		if (avalue != 1 && (bvalue % avalue) == 0 && bvalue / avalue != avalue && is_normalized_div(b, a)) {
 			exprbuf_add(exprs, new_expr(OpDiv, b, a, generation));
 		}
 	}
@@ -94,11 +94,11 @@ void make_half_exprs(ExprBuf *exprs, const Expr *a, const Expr *b, const size_t 
 	}
 
 	if (avalue > bvalue) {
-		if (is_normalized_sub(a, b)) {
+		if (is_normalized_sub(a, b) && avalue - bvalue != bvalue) {
 			exprbuf_add(exprs, new_expr(OpSub, a, b, generation));
 		}
 
-		if (bvalue != 1 && (avalue % bvalue) == 0 && is_normalized_div(a, b)) {
+		if (bvalue != 1 && (avalue % bvalue) == 0 && avalue / bvalue != bvalue && is_normalized_div(a, b)) {
 			exprbuf_add(exprs, new_expr(OpDiv, a, b, generation));
 		}
 	}

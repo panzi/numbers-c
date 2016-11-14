@@ -70,8 +70,8 @@ used in the expression so that during combination the expression
 numbers.
 
 Rules for generated expressions are more strict than with the original number
-game, excluding useless operations like `1 * x` or `x / 1` (fewer generated
-expressions equals faster).
+game, excluding useless operations like `1 * x`, `x / 1`, `(a / b) == b` or
+`(a - b) == b` (fewer generated expressions equals faster).
 
 Addition and multiplication are commutative, which means it doesn't make sense
 to put in `a + b` and `b + a`. In fact the actually generated expressions are
