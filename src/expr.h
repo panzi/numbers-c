@@ -34,10 +34,11 @@ typedef struct ExprS {
 	} u;
 	Number value;
 	NumberSet used;
+	size_t generation;
 } Expr;
 
-Expr *new_val(Number value, size_t index);
-Expr *new_expr(Op op, const Expr *left, const Expr *right);
+Expr *new_val(Number value, size_t index, size_t generation);
+Expr *new_expr(Op op, const Expr *left, const Expr *right, size_t generation);
 
 bool expr_equals(const Expr *left, const Expr *right);
 void expr_fprint(FILE *stream, const Expr *expr);

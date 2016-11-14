@@ -15,6 +15,7 @@ typedef struct ManagerS {
 	ExprBuf exprs;
 	ExprBuf *segments;
 	NumberSet segment_count;
+	volatile size_t generation;
 } Manager;
 
 typedef struct WorkerS {
@@ -26,53 +27,84 @@ typedef struct WorkerS {
 	Manager *manager;
 } Worker;
 
-static void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b);
+static void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b, const size_t generation);
+static void make_half_exprs(ExprBuf *exprs, const Expr *a, const Expr *b, const size_t generation);
 static void *worker_proc(void *arg);
 
-void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b) {
+void make_exprs(ExprBuf *exprs, const Expr *a, const Expr *b, const size_t generation) {
 	const Number avalue = a->value;
 	const Number bvalue = b->value;
 
 	if (is_normalized_add(a, b)) {
-		exprbuf_add(exprs, new_expr(OpAdd, a, b));
+		exprbuf_add(exprs, new_expr(OpAdd, a, b, generation));
 	}
 	else if (is_normalized_add(b, a)) {
-		exprbuf_add(exprs, new_expr(OpAdd, b, a));
+		exprbuf_add(exprs, new_expr(OpAdd, b, a, generation));
 	}
 
 	if (avalue != 1 && bvalue != 1) {
 		if (is_normalized_mul(a, b)) {
-			exprbuf_add(exprs, new_expr(OpMul, a, b));
+			exprbuf_add(exprs, new_expr(OpMul, a, b, generation));
 		}
 		else if (is_normalized_mul(b, a)) {
-			exprbuf_add(exprs, new_expr(OpMul, b, a));
+			exprbuf_add(exprs, new_expr(OpMul, b, a, generation));
 		}
 	}
 
 	if (avalue > bvalue) {
 		if (is_normalized_sub(a, b)) {
-			exprbuf_add(exprs, new_expr(OpSub, a, b));
+			exprbuf_add(exprs, new_expr(OpSub, a, b, generation));
 		}
 
 		if (bvalue != 1 && (avalue % bvalue) == 0 && is_normalized_div(a, b)) {
-			exprbuf_add(exprs, new_expr(OpDiv, a, b));
+			exprbuf_add(exprs, new_expr(OpDiv, a, b, generation));
 		}
 	}
 	else if (bvalue > avalue) {
 		if (is_normalized_sub(b, a)) {
-			exprbuf_add(exprs, new_expr(OpSub, b, a));
+			exprbuf_add(exprs, new_expr(OpSub, b, a, generation));
 		}
 
 		if (avalue != 1 && (bvalue % avalue) == 0 && is_normalized_div(b, a)) {
-			exprbuf_add(exprs, new_expr(OpDiv, b, a));
+			exprbuf_add(exprs, new_expr(OpDiv, b, a, generation));
 		}
 	}
 	else if (bvalue != 1) {
 		if (is_normalized_div(a, b)) {
-			exprbuf_add(exprs, new_expr(OpDiv, a, b));
+			exprbuf_add(exprs, new_expr(OpDiv, a, b, generation));
 		}
 		else if (is_normalized_div(b, a)) {
-			exprbuf_add(exprs, new_expr(OpDiv, b, a));
+			exprbuf_add(exprs, new_expr(OpDiv, b, a, generation));
+		}
+	}
+}
+
+void make_half_exprs(ExprBuf *exprs, const Expr *a, const Expr *b, const size_t generation) {
+	const Number avalue = a->value;
+	const Number bvalue = b->value;
+
+	if (is_normalized_add(a, b)) {
+		exprbuf_add(exprs, new_expr(OpAdd, a, b, generation));
+	}
+
+	if (avalue != 1 && bvalue != 1) {
+		if (is_normalized_mul(a, b)) {
+			exprbuf_add(exprs, new_expr(OpMul, a, b, generation));
+		}
+	}
+
+	if (avalue > bvalue) {
+		if (is_normalized_sub(a, b)) {
+			exprbuf_add(exprs, new_expr(OpSub, a, b, generation));
+		}
+
+		if (bvalue != 1 && (avalue % bvalue) == 0 && is_normalized_div(a, b)) {
+			exprbuf_add(exprs, new_expr(OpDiv, a, b, generation));
+		}
+	}
+	else if (avalue == bvalue && bvalue != 1) {
+		if (is_normalized_div(a, b)) {
+			exprbuf_add(exprs, new_expr(OpDiv, a, b, generation));
 		}
 	}
 }
@@ -111,7 +143,8 @@ void numbers_solutions(
 		// calloc zeroes the newly allocated memory, which a proper
 		// initialization for ExprBuf
 		.segments = calloc(full_usage, sizeof(ExprBuf)),
-		.segment_count = full_usage
+		.segment_count = full_usage,
+		.generation = 0
 	};
 
 	if (!manager.segments) {
@@ -145,14 +178,14 @@ void numbers_solutions(
 			// if any of the given numbers happen to be the target, return that
 			// but don't return a single number twice
 			if (!has_single_number_solution) {
-				Expr *expr = new_val(number, stripped_index);
+				Expr *expr = new_val(number, stripped_index, manager.generation);
 				has_single_number_solution = true;
 				callback(arg, expr);
 				free(expr);
 			}
 		}
 		else {
-			Expr *expr = new_val(number, stripped_index);
+			Expr *expr = new_val(number, stripped_index, manager.generation);
 			exprbuf_add(&manager.exprs, expr);
 			exprbuf_add(&manager.segments[expr->used - 1], expr);
 			++ stripped_index;
@@ -178,6 +211,8 @@ void numbers_solutions(
 #endif
 
 	while (lower < upper) {
+		++ manager.generation;
+
 		size_t worker_count = 0;
 		// ceiling integer division
 		const size_t task_size = 1 + ((upper - lower - 1) / tasks);
@@ -305,24 +340,14 @@ void *worker_proc(void *arg) {
 			break;
 		}
 
+		const size_t generation = manager->generation;
+		const size_t prev_generation = generation - 1;
 		Expr *const *const exprs = manager->exprs.buf;
 
 		for (size_t b = lower; b < upper; ++ b) {
 			const Expr *bexpr = exprs[b];
 			const NumberSet bused = bexpr->used;
 
-			// BUG: This iterates over new and old expressions alike (new as in
-			// generated in the previous iteration). This means for pairs of new
-			// expressions make_exprs gets called twice, which leads to redundant
-			// expressions that need to be fitlered out later, increased runtime
-			// and increased memory usage.
-
-			// Possible solution:
-			// Record the generation in which an expression was generated and
-			// only apply the reverse case in make_exprs if the two passed
-			// expressions are from different generations (or move check outside
-			// and call two different functions, because one of the two
-			// gernerations never changes).
 			for (NumberSet aused = 1; aused <= segment_count; ++ aused) {
 				if ((aused & bused) == 0) {
 					const ExprBuf *segment = &segments[aused - 1];
@@ -331,7 +356,16 @@ void *worker_proc(void *arg) {
 
 					for (size_t index = 0; index < segment_size; ++ index) {
 						const Expr *aexpr = buf[index];
-						make_exprs(new_exprs, aexpr, bexpr);
+						// This means both expression are new expressions.
+						// Any new expressions will occur as aexpr and as bexpr
+						// in this and thus only one half of the expresions need
+						// to be generated for them here.
+						if (aexpr->generation == prev_generation) {
+							make_half_exprs(new_exprs, aexpr, bexpr, generation);
+						}
+						else {
+							make_exprs(new_exprs, aexpr, bexpr, generation);
+						}
 					}
 				}
 			}

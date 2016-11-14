@@ -6,7 +6,7 @@
 
 static void expr_fprint_op(FILE *stream, char op, const Expr *expr);
 
-Expr *new_val(Number value, size_t index) {
+Expr *new_val(Number value, size_t index, size_t generation) {
 	Expr *expr = malloc(sizeof(Expr));
 
 	if (!expr) {
@@ -17,11 +17,12 @@ Expr *new_val(Number value, size_t index) {
 	expr->u.index = index;
 	expr->value = value;
 	expr->used = 1 << index;
+	expr->generation = generation;
 
 	return expr;
 }
 
-Expr *new_expr(Op op, const Expr *left, const Expr *right) {
+Expr *new_expr(Op op, const Expr *left, const Expr *right, size_t generation) {
 	Expr *expr = malloc(sizeof(Expr));
 
 	if (!expr) {
@@ -54,6 +55,7 @@ Expr *new_expr(Op op, const Expr *left, const Expr *right) {
 	}
 
 	expr->used = left->used | right->used;
+	expr->generation = generation;
 
 	return expr;
 }
