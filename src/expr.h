@@ -10,6 +10,7 @@ extern "C" {
 #endif
 
 typedef enum OpE {
+	// these numeric values equal to the corresponding operator precedence
 	OpAdd = 0,
 	OpSub = 1,
 	OpMul = 3,
