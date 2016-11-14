@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <math.h>
 
 typedef struct ManagerS {
 	sem_t semaphore;
@@ -86,14 +85,31 @@ void numbers_solutions(
 		panicf("number of tasks has to be >= 1");
 	}
 
-	if (count > sizeof(NumberSet) * 8) {
+	// Given numbers that already happen to be the target number shall not
+	// be added to the expression list for consitency (expressions that equal
+	// the target number aren't added to the expression list either - I don't
+	// want any loops).
+	size_t non_target_count = 0;
+	for (size_t index = 0; index < count; ++ index) {
+		const Number number = numbers[index];
+		if (number != target) {
+			++ non_target_count;
+		}
+		else if (number == 0) {
+			panicf("given numbers may not be 0");
+		}
+	}
+
+	if (non_target_count > sizeof(NumberSet) * 8) {
 		panicf("only up to %zu numbers supported", sizeof(NumberSet) * 8);
 	}
 
-	const NumberSet full_usage = ~(~0ul << count);
+	const NumberSet full_usage = ~(~0ul << non_target_count);
 	ExprBuf uniq_solutions = EXPRBUF_INIT;
 	Manager manager = {
 		.exprs = EXPRBUF_INIT,
+		// calloc zeroes the newly allocated memory, which a proper
+		// initialization for ExprBuf
 		.segments = calloc(full_usage, sizeof(ExprBuf)),
 		.segment_count = full_usage
 	};
@@ -120,24 +136,30 @@ void numbers_solutions(
 		}
 	}
 
+	// put given numbers into the expressions list
+	bool has_single_number_solution = false;
+	size_t stripped_index = 0;
 	for (size_t index = 0; index < count; ++ index) {
 		const Number number = numbers[index];
-		if (number == 0) {
-			panicf("given numbers may not be 0");
+		if (number == target) {
+			// if any of the given numbers happen to be the target, return that
+			// but don't return a single number twice
+			if (!has_single_number_solution) {
+				Expr *expr = new_val(number, stripped_index);
+				has_single_number_solution = true;
+				callback(arg, expr);
+				free(expr);
+			}
 		}
-		Expr *expr = new_val(number, index);
-		exprbuf_add(&manager.exprs, expr);
-		exprbuf_add(&manager.segments[expr->used - 1], expr);
+		else {
+			Expr *expr = new_val(number, stripped_index);
+			exprbuf_add(&manager.exprs, expr);
+			exprbuf_add(&manager.segments[expr->used - 1], expr);
+			++ stripped_index;
+		}
 	}
 
-	for (size_t index = 0; index < count; ++ index) {
-		const Expr *expr = manager.exprs.buf[index];
-		if (expr->value == target) {
-			callback(arg, expr);
-			break;
-		}
-	}
-
+	// start up all worker threads
 	for (size_t index = 0; index < tasks; ++ index) {
 		Worker *worker = &workers[index];
 		const int errnum = pthread_create(&worker->thread, NULL, &worker_proc, worker);
@@ -146,8 +168,11 @@ void numbers_solutions(
 		}
 	}
 
+	// [lower, upper) define the range of expressions that have to be combined
+	// with previously generated expressions in this iteration.
 	size_t lower = 0;
-	size_t upper = count;
+	size_t upper = manager.exprs.size;
+
 #ifdef DEBUG
 	size_t collisions = 0;
 #endif
