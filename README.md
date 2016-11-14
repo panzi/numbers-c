@@ -158,15 +158,6 @@ multiplications/divisions to only nest on the left side, producing `(a + b) + c`
 instead of `a + (b + c)` and it ensures sorts the expressions with the bigger
 values to the right, producing `1 + 2 + 3` instead of `3 + 2 + 1`.
 
-### BUGS
-
-I think I have a bug in my logic somewhere. Meaning, the `make_exprs()` function
-in `numbers.c` shouldn't need to try the reversed case of the two passed
-expressions because the function should be called with the expression in
-reversed order anyway. But if I don't do that I won't get all results in many
-cases. But as is I also get many doubled results that I shouldn't get and need
-to filter out.
-
 ### Similar programs in other languages
 
  * https://github.com/panzi/numbers-python

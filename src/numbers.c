@@ -311,6 +311,18 @@ void *worker_proc(void *arg) {
 			const Expr *bexpr = exprs[b];
 			const NumberSet bused = bexpr->used;
 
+			// BUG: This iterates over new and old expressions alike (new as in
+			// generated in the previous iteration). This means for pairs of new
+			// expressions make_exprs gets called twice, which leads to redundant
+			// expressions that need to be fitlered out later, increased runtime
+			// and increased memory usage.
+
+			// Possible solution:
+			// Record the generation in which an expression was generated and
+			// only apply the reverse case in make_exprs if the two passed
+			// expressions are from different generations (or move check outside
+			// and call two different functions, because one of the two
+			// gernerations never changes).
 			for (NumberSet aused = 1; aused <= segment_count; ++ aused) {
 				if ((aused & bused) == 0) {
 					const ExprBuf *segment = &segments[aused - 1];
