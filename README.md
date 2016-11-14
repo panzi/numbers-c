@@ -23,7 +23,7 @@ Passing `-` for the number of threads will try to detect the number of CPUs
 Unix systems that support `sysconf(_SC_NPROCESSORS_ONLN)` (e.g. recent Linux;
 FreeBSD and Mac OS X also support this, but I haven't tested those systems).
 
-### Number Game Rules
+### Numbers Game Rules
 
 In this "given number" doesn't refer to a certain value of a number, but to
 a number as given in the problem set. The same value may occur more than once
@@ -44,7 +44,7 @@ on a 64bit machine (32 on a 32bit machine).
 
 ### Algorithm
 
-The simplest algorithm to solve a number game is:
+The simplest algorithm to solve a numbers game is:
 
  * define a list of intermediate expressions
  * define a list of results
@@ -69,7 +69,7 @@ used in the expression so that during combination the expression
 `(a->used & b->used) == 0` to test if the two expressions don't use the same
 numbers.
 
-Rules for generated expressions are more strict than with the original number
+Rules for generated expressions are more strict than with the original numbers
 game, excluding useless operations like `1 * x`, `x / 1`, `(a / b) == b` or
 `(a - b) == b` (fewer generated expressions equals faster).
 
@@ -155,8 +155,8 @@ IsNormalizedDivision(left, right) =>
 
 These rules allow sequences of additions/substractions and sequences of
 multiplications/divisions to only nest on the left side, producing `(a + b) + c`
-instead of `a + (b + c)` and it ensures sorts the expressions with the bigger
-values to the right, producing `1 + 2 + 3` instead of `3 + 2 + 1`.
+instead of `a + (b + c)` and they sort the expressions with the bigger values to
+the right, producing `1 + 2 + 3` instead of `3 + 2 + 1`.
 
 ### Similar programs in other languages
 
