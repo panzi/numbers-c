@@ -40,7 +40,9 @@ In the original game from the TV show only certain given numbers are allowed,
 there are always 6 of them, and the target number is in the range 101 to 999.
 But this program can take any positive integer (`unsigned long`) for any number
 and the target. Given enough RAM and CPU time it supports up to 64 given numbers
-on a 64bit machine (32 on a 32bit machine).
+on a 64bit machine (32 on a 32bit machine). On my machine (16 GB RAM, 64bit
+Linux) up to 8 numbers work fine (of course depending a lot on the given
+numbers).
 
 ### Algorithm
 
