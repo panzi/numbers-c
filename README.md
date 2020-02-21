@@ -3,6 +3,16 @@ numbers-c
 
 Countdown numbers game solver written in C.
 
+See also an even faster implementation:
+[https://github.com/panzi/numbers](https://github.com/panzi/numbers)
+
+Both support multi threading, but that other implementation is even
+faster when using only a singly thread than this one using 8. And
+running that other implementation in multi threading is even faster
+of course.
+
+Though these two programs don't give the exact same output.
+
 ### Build
 
 ```
