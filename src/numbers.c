@@ -140,7 +140,7 @@ void numbers_solutions(
 	ExprBuf uniq_solutions = EXPRBUF_INIT;
 	Manager manager = {
 		.exprs = EXPRBUF_INIT,
-		// calloc zeroes the newly allocated memory, which a proper
+		// calloc zeroes the newly allocated memory, which is a proper
 		// initialization for ExprBuf
 		.segments = calloc(full_usage, sizeof(ExprBuf)),
 		.segment_count = full_usage,

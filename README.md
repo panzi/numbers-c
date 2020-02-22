@@ -162,6 +162,9 @@ the right, producing `1 + 2 + 3` instead of `3 + 2 + 1`.
 
 ### Similar programs in other languages
 
- * https://github.com/panzi/numbers-python
- * https://github.com/panzi/numbers-js
- * https://github.com/panzi/numbers-rust
+* https://github.com/panzi/numbers-python
+* https://github.com/panzi/numbers-js
+* https://github.com/panzi/numbers-rust
+* https://github.com/panzi/numbers Different C implementation using a different
+  strategy and is a little bit faster while simpler. Currently doesn't give the
+  exact same output, but prints many more solutions. Have to investigate why.
